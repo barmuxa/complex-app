@@ -12,6 +12,7 @@ Problems I ran into and what I learned while building the Complex App.
   - [Lesson 43 – `href="main.css"` vs `href="/main.css"`](#lesson-43--hrefmaincss-vs-hrefmaincss)
 - [Git notes](#git-notes)
   - [Git – `git status` shows folders, not the files inside](#git--git-status-shows-folders-not-the-files-inside)
+  - [Git – fixing a commit message after pushing (`--amend`, then "cannot push")](#git--fixing-a-commit-message-after-pushing---amend-then-cannot-push)
 
 # Course lessons
 
@@ -153,3 +154,26 @@ Git questions I had along the way. Git isn't part of the course, so these have n
      `git status` always list the files.
 - **What I learned:** a folder in `git status` doesn't mean only the folder is new; it means
   everything inside is untracked. `-u` shows exactly which files those are.
+
+## Git – fixing a commit message after pushing (`--amend`, then "cannot push")
+
+- **Date:** 2026-10-27
+- **Where:** my setup (git and GitHub)
+- **What happened:** I wanted to change one letter in my last commit message
+  (`use ejs` → `Use ejs`), which I had already pushed. I ran `git commit --amend` and
+  fixed it, but then `git push` was rejected. I expected the push to just update the message.
+- **Cause:** a commit can't be edited. `--amend` makes a _new_ commit with a new ID
+  (`5abf5a3` → `60513fb`) and drops the old one from my branch. GitHub still had the old
+  one, so `git status` said `ahead 1, behind 1`. A normal push never removes commits from
+  GitHub, so it was rejected.
+- **What I do now:**
+  1. Fix commit messages _before_ pushing: `git commit --amend` (opens the editor) or
+     `git commit --amend -m "new message"`.
+  2. If it's already pushed and I'm the only one using the branch, push with
+     `git push --force-with-lease`. It replaces GitHub's commit with mine, but refuses
+     if GitHub has something I haven't seen yet.
+  3. Don't run `git pull` in this situation: it would merge the old commit back in.
+  4. For a one-letter typo, it's also fine to leave it.
+- **What I learned:** amending rewrites history: same files, new commit ID. That's
+  harmless before pushing, but after pushing it needs a force push, which is only safe
+  on a branch nobody else uses.
