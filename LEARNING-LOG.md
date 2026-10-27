@@ -1,3 +1,22 @@
+# Learning Log
+
+Problems I ran into and what I learned while building the Complex App.
+
+## Contents
+
+- [Course lessons](#course-lessons)
+  - [Lesson 42 – Brad's finished product (Docker demo) crashed](#lesson-42--brads-finished-product-docker-demo-crashed)
+  - [Lesson 45 – package versions, package-lock.json and npm ci](#lesson-45--package-versions-package-lockjson-and-npm-ci)
+  - [Lesson 45 – package.json vs package-lock.json: where are the installed versions?](#lesson-45--packagejson-vs-package-lockjson-where-are-the-installed-versions)
+  - [Lesson 43 – why `__dirname` in `app.set('views', ...)`](#lesson-43--why-__dirname-in-appsetviews-)
+  - [Lesson 43 – `href="main.css"` vs `href="/main.css"`](#lesson-43--hrefmaincss-vs-hrefmaincss)
+- [Git notes](#git-notes)
+  - [Git – `git status` shows folders, not the files inside](#git--git-status-shows-folders-not-the-files-inside)
+
+# Course lessons
+
+Things I learned from Brad's course, by lesson number.
+
 ## Lesson 42 – Brad's finished product (Docker demo) crashed
 
 - **Date:** 2026-10-20
@@ -53,8 +72,9 @@
   - `npm install express@5`: changes only the express line
   - `npm uninstall md5`: removes only that line
   - editing it by hand (e.g. replacing it with Brad's lesson-45 file): whatever I change
-    The lock also only updates affected entries, except when it's created for the
-    first time or deleted and regenerated.
+
+  The lock also only updates affected entries, except when it's created for the
+  first time or deleted and regenerated.
 - **What I do now:**
   1. Read package.json to see _which_ packages the project uses.
   2. Check the _really installed_ versions with `npm ls --depth=0`
@@ -65,3 +85,71 @@
 - **What I learned:** package.json = names + allowed ranges; package-lock.json = exact
   installed versions; `npm ls` = the quick way to see them. package.json only changes
   when I add, remove or change a package (one line each), never on a plain `npm install`.
+
+## Lesson 43 – why `__dirname` in `app.set('views', ...)`
+
+- **Date:** 2026-10-27
+- **Where:** my app (`app.js`)
+- **What happened:** I wrote `app.set('views', __dirname + '/views');` and wondered if
+  `__dirname` is needed at all. I thought `'views'` alone would always find my `views` folder.
+- **Cause:** a relative path like `'views'` is resolved from `process.cwd()`, the folder I
+  _run_ `node` from, not the folder `app.js` is in. `__dirname` is the absolute path of the
+  folder that contains the current file (here `complex-app`), so `__dirname + '/views'`
+  always points to `complex-app/views`.
+  - `node app.js` from `complex-app/`: both versions find `complex-app/views`
+  - `node complex-app/app.js` from the parent folder: `'views'` looks in `parent/views`
+    and EJS can't find `home-guest`; `__dirname + '/views'` still works
+
+  Express's default for `views` is also `process.cwd() + '/views'`, so it has the same
+  problem.
+- **What I do now:**
+  1. Keep `__dirname + '/views'` in `app.set('views', ...)`.
+  2. If I get a "Failed to lookup view" error, first check which folder I started
+     `node` from.
+- **What I learned:** relative paths depend on where I start the app; `__dirname` depends on
+  where the file is. `__dirname` makes the path work no matter where `node` is started.
+
+## Lesson 43 – `href="main.css"` vs `href="/main.css"`
+
+- **Date:** 2026-10-27
+- **Where:** my app (`views/home-guest.ejs`)
+- **What happened:** my template has `<link rel="stylesheet" href="main.css">` and the CSS
+  loads fine on `/`. I wondered if I need a `/` in front, since it already works.
+- **Cause:** without the `/`, the browser treats `main.css` as relative to the _current
+  page's folder_. With the `/`, it always starts from the site root, and that is where
+  `app.use(express.static(__dirname + '/public'))` serves `public/main.css`.
+  - on `/`: both request `/main.css`
+  - on `/post/123`: `main.css` requests `/post/main.css` (404), `/main.css` still works
+  - on `/profile/brad/followers`: `main.css` requests `/profile/brad/main.css` (404)
+
+  So it only breaks later, on deeper URLs. The page still gets Bootstrap from the CDN,
+  so it looks only a little off, and that is easy to miss.
+- **What I do now:**
+  1. Start links to my own files (CSS, JS, images) with `/`, e.g. `href="/main.css"`.
+  2. If a page looks unstyled, open DevTools → Network and check which URL the CSS
+     was requested from.
+- **What I learned:** a link without `/` depends on the page URL; a link with `/` always
+  starts from the root that `express.static` serves. Working on `/` doesn't prove it works
+  everywhere.
+
+# Git notes
+
+Git questions I had along the way. Git isn't part of the course, so these have no lesson number.
+
+## Git – `git status` shows folders, not the files inside
+
+- **Date:** 2026-10-27
+- **Where:** my setup (git)
+- **What happened:** after adding `views/home-guest.ejs` and `public/main.css`, `git status`
+  only showed `views/` and `public/`. I expected to see the file names.
+- **Cause:** when _nothing_ in a folder is tracked yet, git shows the folder as one line
+  instead of listing every file in it. Once a file in the folder is committed, new files
+  there are listed one by one.
+- **What I do now:**
+  1. Run `git status -u` (short for `--untracked-files=all`) to see every untracked file.
+  2. For a compact list, run `git status -s -u`: `??` = untracked, `M` = modified.
+     Today it showed `?? public/main.css` and `?? views/home-guest.ejs`.
+  3. Optional: `git config --global status.showUntrackedFiles all` makes plain
+     `git status` always list the files.
+- **What I learned:** a folder in `git status` doesn't mean only the folder is new; it means
+  everything inside is untracked. `-u` shows exactly which files those are.

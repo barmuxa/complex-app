@@ -7,9 +7,16 @@ Add a new entry to LEARNING-LOG.md in the project root (my learning log for Brad
 
 What to write about: usually we have just discussed a problem in this conversation. Base the entry on that discussion (what I did, what went wrong, why, how we fixed it). If I wrote a topic after the command (see the last line), focus on that. If neither makes it clear what the note is about, ask me before writing.
 
+File layout: the title and intro line, then `## Contents`, then one `#` section per topic, each with a one-line intro:
+- `# Course lessons`: anything Brad's course teaches (Node, Express, EJS, npm, MongoDB, etc.).
+- `# Git notes`: git questions (git isn't part of the course).
+If an entry fits neither section, ask me whether to add a new section before writing it.
+
 Format. Copy it exactly from the existing entries:
-- Add the entry at the END of the file (oldest first). Don't touch the title, the intro line or any existing entry.
-- Heading: `## Lesson <number> – <short title>`, with an en dash (–). If you don't know the lesson number, ask me.
+- Add the entry at the END of its section (oldest first). Don't touch the title, the intro lines or any existing entry.
+- Add a line for the entry at the end of its section's list in `## Contents`: `  - [<heading text>](#<anchor>)`. Make the anchor the way GitHub does: lowercase, remove backticks and every character except letters, digits, `_`, `-` and spaces, then turn each space into `-` (so ` – ` becomes `--`). If you add a new section, add it to `## Contents` too.
+- Heading for a course entry: `## Lesson <number> – <short title>`, with an en dash (–). If you don't know the lesson number, ask me.
+- Heading for a git entry: `## Git – <short title>`, with an en dash (–). No lesson number.
 - Then these bullets, in this order, each label in bold:
   - **Date:** today's date, YYYY-MM-DD
   - **Where:** in my app, in Brad's demo (complex-finished-product), or in my setup
