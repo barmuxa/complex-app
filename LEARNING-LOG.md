@@ -10,9 +10,12 @@ Problems I ran into and what I learned while building the Complex App.
   - [Lesson 45 – package.json vs package-lock.json: where are the installed versions?](#lesson-45--packagejson-vs-package-lockjson-where-are-the-installed-versions)
   - [Lesson 43 – why `__dirname` in `app.set('views', ...)`](#lesson-43--why-__dirname-in-appsetviews-)
   - [Lesson 43 – `href="main.css"` vs `href="/main.css"`](#lesson-43--hrefmaincss-vs-hrefmaincss)
+  - [Lesson 47 – `module.exports` vs `exports`](#lesson-47--moduleexports-vs-exports)
+  - [Lesson 47 – MVC: which code goes in which file](#lesson-47--mvc-which-code-goes-in-which-file)
 - [Git notes](#git-notes)
   - [Git – `git status` shows folders, not the files inside](#git--git-status-shows-folders-not-the-files-inside)
   - [Git – fixing a commit message after pushing (`--amend`, then "cannot push")](#git--fixing-a-commit-message-after-pushing---amend-then-cannot-push)
+  - [Git – an empty folder is not committed](#git--an-empty-folder-is-not-committed)
 
 # Course lessons
 
@@ -133,6 +136,57 @@ Things I learned from Brad's course, by lesson number.
   starts from the root that `express.static` serves. Working on `/` doesn't prove it works
   everywhere.
 
+## Lesson 47 – `module.exports` vs `exports`
+
+- **Date:** 2026-10-27
+- **Where:** my app (`router.js` and `controllers/userController.js`)
+- **What happened:** `router.js` ends with `module.exports = router;`, but
+  `controllers/userController.js` uses `exports.login = function (req, res) {};`.
+  I didn't know why there are two ways, or if they are the same thing.
+- **Cause:** when Node loads a file, it creates one empty object, `module.exports = {}`,
+  and a shortcut variable `exports` that points to the _same_ object. `require()` always
+  returns `module.exports`.
+  - `exports.login = ...` adds a property to that shared object, so `require` gets
+    `{ login, logout, register, home }`. Writing `module.exports.login = ...` does the same.
+  - `module.exports = router` replaces the whole object, so `require('./router')`
+    returns the router itself, which `app.use('/', router)` in `app.js` needs.
+  - `exports = router` would only point the shortcut somewhere else. `module.exports`
+    would still be `{}`, and `require` would return `{}`.
+- **What I do now:**
+  1. Several named things (like controller functions): `exports.name = ...`.
+  2. One single thing (a router, a class, one function): `module.exports = ...`.
+  3. Never write `exports = ...`.
+- **What I learned:** `exports` is just a shortcut to `module.exports`, and `require`
+  returns `module.exports`. Adding properties works with either, but replacing the whole
+  export only works with `module.exports`.
+
+## Lesson 47 – MVC: which code goes in which file
+
+- **Date:** 2026-10-27
+- **Where:** my app (`router.js`, `controllers/`, `views/`)
+- **What happened:** Brad started MVC (Model–View–Controller) and said it's hard to get
+  my head around. At first I didn't see why the code is split into so many files, when
+  my first route in `router.js` did everything inline.
+- **Cause:** MVC is a rule about _which job_ goes in _which file_, so that each file
+  does one thing. It's like a restaurant:
+  - **Router** (the host at the door): `router.js` only says which URL goes to which
+    controller function, e.g. `router.get('/', userController.home);`.
+  - **Controller** (the waiter): `controllers/userController.js` takes the request, asks
+    the model for what's needed and sends back a response, e.g. `exports.home` does
+    `res.render('home-guest')`. It doesn't "cook".
+  - **Model** (the kitchen): the data and its rules (validate, save to and read from
+    MongoDB). It knows nothing about URLs or HTML. I don't have a `models` folder yet.
+  - **View** (the plating): `views/home-guest.ejs` only turns data into HTML.
+
+  One request: browser → router → controller → model → controller → view → browser.
+- **What I do now:**
+  1. When I write new code, I first ask: is it a URL (router), a data rule or database
+     work (model), HTML (view), or the glue between them (controller)?
+  2. When something is wrong, I open the file for that job: wrong URL → `router.js`,
+     wrong data rules → the model, wrong HTML → the view.
+- **What I learned:** MVC isn't new code, it's a way to sort code. The controller is the
+  thin middle that connects the model (data and rules) with the view (HTML).
+
 # Git notes
 
 Git questions I had along the way. Git isn't part of the course, so these have no lesson number.
@@ -177,3 +231,21 @@ Git questions I had along the way. Git isn't part of the course, so these have n
 - **What I learned:** amending rewrites history: same files, new commit ID. That's
   harmless before pushing, but after pushing it needs a force push, which is only safe
   on a branch nobody else uses.
+
+## Git – an empty folder is not committed
+
+- **Date:** 2026-10-27
+- **Where:** my setup (git)
+- **What happened:** I had an empty `controllers` folder in my app and wondered if it
+  would be part of my commit. I thought git would save the folder, even with nothing in it.
+- **Cause:** git tracks only _files_, not folders. A folder exists in a commit only because
+  a file inside it has that path, e.g. `views/home-guest.ejs`. An empty folder doesn't show
+  in `git status` (not even with `-u`), can't be added with `git add`, and won't exist
+  on GitHub or after cloning.
+- **What I do now:**
+  1. Usually nothing: the folder gets committed as soon as I put its first file in it.
+  2. If an empty folder really must exist in the repo, I add a placeholder file:
+     `touch controllers/.gitkeep`, then `git add controllers/.gitkeep`. `.gitkeep` is
+     just a common name, not a git feature. I delete it once the folder has real files.
+- **What I learned:** git sees paths of files, not folders. No files inside means no
+  folder in the commit.
