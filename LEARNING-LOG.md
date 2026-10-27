@@ -35,3 +35,33 @@
   _was_ installed. `npm ci` installs exactly the lock, never changes it, and fails loudly
   if the two files disagree. Docker only freezes what's inside the image, and Brad's setup
   installed packages at startup, so they weren't frozen.
+
+## Lesson 45 – package.json vs package-lock.json: where are the installed versions?
+
+- **Date:** 2026-10-27
+- **Where:** my Complex App setup
+- **What happened:** I read package.json to see my packages and presumed `npm install`
+  would update it, either rewriting all lines or the ones being installed, with the
+  versions it actually installed. It doesn't: package.json still says
+  `"express": "^4.19.2"`, while the really installed version (e.g. 4.21.2) is only
+  in package-lock.json.
+- **Cause:** package.json is the wish list (which ranges _may_ be installed);
+  package-lock.json is the receipt (what _was_ installed). package.json changes only
+  one line at a time:
+  - `npm install` / `npm ci` with no package name: never changes it
+  - `npm install validator`: adds one line, `"validator": "^<installed version>"`
+  - `npm install express@5`: changes only the express line
+  - `npm uninstall md5`: removes only that line
+  - editing it by hand (e.g. replacing it with Brad's lesson-45 file): whatever I change
+    The lock also only updates affected entries, except when it's created for the
+    first time or deleted and regenerated.
+- **What I do now:**
+  1. Read package.json to see _which_ packages the project uses.
+  2. Check the _really installed_ versions with `npm ls --depth=0`
+     (or one package: `npm ls socket.io`).
+  3. Put Brad's lesson-45 package.json in place _before_ the first install, so I never
+     need the "delete the lock and reinstall" step.
+  4. Use `git diff` to see exactly which lines of package.json and package-lock.json changed.
+- **What I learned:** package.json = names + allowed ranges; package-lock.json = exact
+  installed versions; `npm ls` = the quick way to see them. package.json only changes
+  when I add, remove or change a package (one line each), never on a plain `npm install`.
