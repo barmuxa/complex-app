@@ -12,6 +12,7 @@ Problems I ran into and what I learned while building the Complex App.
   - [Lesson 43 – `href="main.css"` vs `href="/main.css"`](#lesson-43--hrefmaincss-vs-hrefmaincss)
   - [Lesson 47 – `module.exports` vs `exports`](#lesson-47--moduleexports-vs-exports)
   - [Lesson 47 – MVC: which code goes in which file](#lesson-47--mvc-which-code-goes-in-which-file)
+  - [Lesson 52 – bogus properties: mass assignment and the allow-list in `cleanUp`](#lesson-52--bogus-properties-mass-assignment-and-the-allow-list-in-cleanup)
 - [Git notes](#git-notes)
   - [Git – `git status` shows folders, not the files inside](#git--git-status-shows-folders-not-the-files-inside)
   - [Git – fixing a commit message after pushing (`--amend`, then "cannot push")](#git--fixing-a-commit-message-after-pushing---amend-then-cannot-push)
@@ -186,6 +187,35 @@ Things I learned from Brad's course, by lesson number.
      wrong data rules → the model, wrong HTML → the view.
 - **What I learned:** MVC isn't new code, it's a way to sort code. The controller is the
   thin middle that connects the model (data and rules) with the view (HTML).
+
+## Lesson 52 – bogus properties: mass assignment and the allow-list in `cleanUp`
+
+- **Date:** 2026-10-28
+- **Where:** my app (`models/User.js`, `User.prototype.cleanUp`)
+- **What happened:** Brad said to ignore any extra "bogus" properties besides `username`,
+  `email` and `password`, but didn't explain the danger. In my lesson 51 check, a request
+  to `/register` with an extra `isAdmin=true` was accepted ("Congrats, there are no
+  errors"). I thought the server only gets the fields my form has.
+- **Cause:** the server never sees my form, only the request, and anyone can add fields
+  to it (DevTools → Inspect → add an `<input>`, or `curl`/Postman). The extra field goes
+  all the way: `req.body` → `new User(req.body)` → `this.data` → (next lesson)
+  `insertOne(this.data)`. MongoDB stores whatever object I give it, so without a clean-up
+  the visitor decides what's saved in their user document:
+  - `isAdmin: true`: harmless today, an admin the day I write `if (user.isAdmin)`
+  - their own `_id`
+  - megabytes of junk text
+
+  This attack is called _mass assignment_. In 2012 Egor Homakov used it on GitHub to add
+  his key to the Ruby on Rails repository.
+- **What I do now:**
+  1. In `cleanUp`, rebuild `this.data` from only the fields I expect (an _allow-list_):
+     `this.data = { username: ..., email: ..., password: ... }`. Everything else is dropped.
+  2. Never save `req.body` directly; copy over only the fields I need. Same later for
+     posts (`title`, `body`).
+  3. Prefer an allow-list over a block-list (`delete this.data.isAdmin`), which only
+     stops the fields I thought of.
+- **What I learned:** I can't control what reaches my server, only what I accept and
+  keep. "Accept only what I described" is safer than "reject what looks bad".
 
 # Git notes
 
