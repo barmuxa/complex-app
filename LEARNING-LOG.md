@@ -13,6 +13,9 @@ Problems I ran into and what I learned while building the Complex App.
   - [Lesson 47 – `module.exports` vs `exports`](#lesson-47--moduleexports-vs-exports)
   - [Lesson 47 – MVC: which code goes in which file](#lesson-47--mvc-which-code-goes-in-which-file)
   - [Lesson 52 – bogus properties: mass assignment and the allow-list in `cleanUp`](#lesson-52--bogus-properties-mass-assignment-and-the-allow-list-in-cleanup)
+  - [Lesson 55 – creating a database with the MongoDB VS Code extension (Playground)](#lesson-55--creating-a-database-with-the-mongodb-vs-code-extension-playground)
+  - [Lesson 55 – does `"main"` in package.json have to be `db.js`?](#lesson-55--does-main-in-packagejson-have-to-be-dbjs)
+  - [Lesson 56 – what `dotenv.config()` does](#lesson-56--what-dotenvconfig-does)
 - [Git notes](#git-notes)
   - [Git – `git status` shows folders, not the files inside](#git--git-status-shows-folders-not-the-files-inside)
   - [Git – fixing a commit message after pushing (`--amend`, then "cannot push")](#git--fixing-a-commit-message-after-pushing---amend-then-cannot-push)
@@ -216,6 +219,83 @@ Things I learned from Brad's course, by lesson number.
      stops the fields I thought of.
 - **What I learned:** I can't control what reaches my server, only what I accept and
   keep. "Accept only what I described" is safer than "reject what looks bad".
+
+## Lesson 55 – creating a database with the MongoDB VS Code extension (Playground)
+
+- **Date:** 2026-10-28
+- **Where:** my setup (MongoDB for VS Code extension, connected to Atlas)
+- **What happened:** I clicked _Create Database_ in the MongoDB extension and expected a
+  form asking for a database name. Instead it opened a Playground, a `.mongodb.js` file
+  with template code, and I wasn't sure if that was the right way.
+- **Cause:** MongoDB creates databases _lazily_: a database only exists once one of its
+  collections has data in it. That's why there is nothing to "create" with a form. The
+  template does it with code:
+  - `use('dbName')` only switches to the database; it creates nothing yet
+  - `db.getCollection('users').insertOne({...})` saves a document, and that creates the
+    database and the collection
+- **What I do now:**
+  1. In the template, change the database name (and collection name) to the one I want.
+  2. Check in the status bar that the Playground uses my Atlas connection, not a local one.
+  3. Click _Run_ (▶) at the top right, or Command Palette → _MongoDB: Run All From
+     Playground_.
+  4. Refresh the connection in the MongoDB sidebar to see the new database.
+  5. Don't save the Playground into the project; if I do, delete it or add `*.mongodb.js`
+     to `.gitignore` so it stays out of my lesson commits.
+- **What I learned:** in MongoDB, a database or collection appears the first time I insert
+  data into it, so the Playground is the normal way to create one from VS Code. My app's
+  first `insertOne` would create the `users` collection on its own anyway.
+
+## Lesson 55 – does `"main"` in package.json have to be `db.js`?
+
+- **Date:** 2026-10-28
+- **Where:** my app (`package.json`, `db.js`, `app.js`)
+- **What happened:** I moved `app.listen(3000, ...)` out of `app.js` into the new `db.js`,
+  so the app now starts from `db.js`. I changed the scripts to `"start": "node db.js"`
+  and `"watch": "nodemon db"`, but `package.json` still says `"main": "app.js"`. I thought
+  `"main"` had to point to the file that starts the server.
+- **Cause:** `"main"` is the file Node loads when _another_ project does
+  `require('complex-app')`, i.e. when my project is used as a library. Nobody does that
+  with this app. What really starts it are my scripts, and they name the file directly:
+  - `npm start` runs `node db.js`
+  - `npm run watch` runs `nodemon db`
+
+  The only time `"main"` matters for me is plain `nodemon` with no file name: then
+  nodemon falls back to `"main"` and runs `app.js`. That file no longer calls `listen()`,
+  so the server would never start.
+- **What I do now:**
+  1. Leave `"main": "app.js"` as Brad has it. Changing it to `"db.js"` would also be
+     fine; nothing breaks either way.
+  2. Start the app with `npm run watch` (or `npm start`), never plain `nodemon`.
+- **What I learned:** the `scripts` decide which file starts my app; `"main"` is only for
+  `require`-ing the package from somewhere else.
+
+## Lesson 56 – what `dotenv.config()` does
+
+- **Date:** 2026-10-28
+- **Where:** my app (`db.js`, `.env`)
+- **What happened:** I moved my Atlas connection string out of `db.js` into a `.env` file
+  and added `const dotenv = require('dotenv');` and `dotenv.config();` (`dotenv@16.6.1`).
+  I didn't know what `dotenv.config()` actually does.
+- **Cause:** `process.env` is the object where Node keeps environment variables.
+  `dotenv.config()` reads the `.env` file and copies every `KEY=value` line onto
+  `process.env`. After that, `process.env.KEY` holds the value, which is how
+  `new MongoClient(process.env...)` gets the connection string.
+  - it looks for `.env` in the folder I _start_ `node` from (`process.cwd()`), not the
+    folder of `db.js`
+  - it must run _before_ any line that reads `process.env`
+  - it doesn't overwrite a variable that's already set (in my shell, or on a host like
+    Render), so the host can use its own values without a `.env` file
+  - a missing `.env` or a misspelled name gives no error, just `undefined`
+  - every value is a string: `PORT=3000` gives `"3000"`, not the number `3000`
+- **What I do now:**
+  1. Put secrets (connection string, passwords) only in `.env`, never in the code.
+  2. Keep `.env` in `.gitignore` so it never gets committed.
+  3. Call `dotenv.config()` at the very top of the file that starts the app (`db.js`).
+  4. If a value is `undefined`, check that the name in `.env` and in `process.env.NAME`
+     is spelled exactly the same, and that I started `node` from the project folder.
+- **What I learned:** `dotenv.config()` just copies `.env` into `process.env` once, at
+  startup. It keeps secrets out of my code and out of git, and other computers can
+  give the same names different values.
 
 # Git notes
 
