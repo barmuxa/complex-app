@@ -20,6 +20,7 @@ Problems I ran into and what I learned while building the Complex App.
   - [Git – `git status` shows folders, not the files inside](#git--git-status-shows-folders-not-the-files-inside)
   - [Git – fixing a commit message after pushing (`--amend`, then "cannot push")](#git--fixing-a-commit-message-after-pushing---amend-then-cannot-push)
   - [Git – an empty folder is not committed](#git--an-empty-folder-is-not-committed)
+  - [Git – working directory, staging area and last commit (`git diff` vs `git diff HEAD`)](#git--working-directory-staging-area-and-last-commit-git-diff-vs-git-diff-head)
 
 # Course lessons
 
@@ -359,3 +360,33 @@ Git questions I had along the way. Git isn't part of the course, so these have n
      just a common name, not a git feature. I delete it once the folder has real files.
 - **What I learned:** git sees paths of files, not folders. No files inside means no
   folder in the commit.
+
+## Git – working directory, staging area and last commit (`git diff` vs `git diff HEAD`)
+
+- **Date:** 2026-10-28
+- **Where:** my setup (git)
+- **What happened:** I wanted to see everything I had changed since my last commit. I
+  thought plain `git diff` always shows that, but it only compares with the staging area,
+  so changes I had already `git add`-ed weren't in it.
+- **Cause:** git keeps my files in three places ("areas"):
+  - **working directory**: the files on my disk, as I edit them
+  - **staging area** (also called the _index_): what I've `git add`-ed, i.e. what the next
+    commit will contain
+  - **last commit** (`HEAD`): what was saved by my last `git commit`
+
+  Each `git diff` command compares two of them:
+  - `git diff`: working directory vs staging area (changes I haven't added yet)
+  - `git diff --staged`: staging area vs last commit (what the next commit will contain)
+  - `git diff HEAD`: working directory vs last commit (everything since the last commit)
+
+  Once I `git add` a file, its changes disappear from `git diff` and move to
+  `git diff --staged`. `git diff HEAD` shows them either way.
+- **What I do now:**
+  1. To see everything I changed since the last commit: `git diff HEAD`
+     (`git diff HEAD --stat` for just a list of files and line counts).
+  2. Before committing, check what will really go in: `git diff --staged`.
+  3. Run `git status` too, because no `git diff` shows untracked (brand-new) files.
+  4. For one file only: `git diff HEAD -- models/User.js`.
+- **What I learned:** `git diff` with no arguments doesn't mean "since my last commit",
+  it means "not staged yet". `HEAD` is the last commit, so `git diff HEAD` is the one that
+  compares my files with it.
