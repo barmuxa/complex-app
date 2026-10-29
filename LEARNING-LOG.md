@@ -18,6 +18,7 @@ Problems I ran into and what I learned while building the Complex App.
   - [Lesson 55 – does `"main"` in package.json have to be `db.js`?](#lesson-55--does-main-in-packagejson-have-to-be-dbjs)
   - [Lesson 56 – what `dotenv.config()` does](#lesson-56--what-dotenvconfig-does)
   - [Lesson 60 – three ways to wait for slow work: callbacks, `.then`, `async`/`await`](#lesson-60--three-ways-to-wait-for-slow-work-callbacks-then-asyncawait)
+  - [Lesson 62 – hashing passwords with bcryptjs: `hashSync` and `compareSync`](#lesson-62--hashing-passwords-with-bcryptjs-hashsync-and-comparesync)
 - [Git notes](#git-notes)
   - [Git – `git status` shows folders, not the files inside](#git--git-status-shows-folders-not-the-files-inside)
   - [Git – fixing a commit message after pushing (`--amend`, then "cannot push")](#git--fixing-a-commit-message-after-pushing---amend-then-cannot-push)
@@ -379,6 +380,65 @@ Things I learned from Brad's course, by lesson number.
 - **What I learned:** all three solve the same problem: "do this when the slow work is
   done". Callbacks nest, `.then` chains stay flat, and `await` reads like normal code. A
   rejected Promise still needs a `try`/`catch` or a `.catch`.
+
+## Lesson 62 – hashing passwords with bcryptjs: `hashSync` and `compareSync`
+
+- **Date:** 2026-10-29
+- **Where:** my app (`models/User.js`, the model's `register`, `login` and `validate`)
+- **What happened:** my users' passwords were saved in Atlas as plain text. Brad added
+  `bcryptjs` (`bcryptjs@2.4.3`): the model's `register` now saves a long hash instead of
+  the password, and the model's `login` checks it with `bcrypt.compareSync(...)`. I wanted
+  to understand what both steps really do, and why `==` doesn't work anymore.
+- **Cause:** if my database ever leaked, plain-text passwords would also open my users'
+  other accounts, because people reuse passwords. A _hash_ is a one-way conversion
+  (Brad: like burning paper into ash). Encryption can be decrypted; a hash can't be
+  turned back into the password, it can only be checked.
+
+  **Hashing (the model's `register`):**
+  ```js
+  let salt = bcrypt.genSaltSync(10);
+  this.data.password = bcrypt.hashSync(this.data.password, salt);
+  ```
+  - `genSaltSync(10)` makes a _salt_: a random value, new for every user. `10` is the
+    _cost_: bcrypt runs 2¹⁰ rounds, slow on purpose (about 68 ms on my Mac), so an
+    attacker can't try millions of guesses quickly.
+  - `hashSync` mixes the password with the salt and returns a 60-character string, and
+    I overwrite `this.data.password` with it before `insertOne`. The salt is stored
+    _inside_ the hash, so I don't need a separate field for it:
+    `$2a$` (algorithm) + `10$` (cost) + 22 characters of salt + 31 characters of hash.
+  - because the salt is random, the same password gives a different hash every time. Two
+    users with the same password don't get the same hash, and an attacker can't look
+    hashes up in a ready-made table of common passwords.
+  - it runs inside `if (!this.errors.length)`, after `validate`: the length checks need
+    the password as typed (every hash is 60 characters), and there's no point hashing a
+    password that gets rejected.
+
+  **Comparing (the model's `login`):**
+  ```js
+  if (attemptedUser && bcrypt.compareSync(this.data.password, attemptedUser.password)) {
+  ```
+  - `==` can't work anymore: the typed password is plain text, the stored one is a hash.
+  - hashing the typed password again with `hashSync` wouldn't match either, because a
+    new random salt would give a different hash.
+  - `compareSync(typed, storedHash)` reads the salt and cost out of the stored hash,
+    hashes the typed password with that _same_ salt, and returns `true` if the results
+    match, `false` if not. The order matters: plain password first, hash second.
+  - the old plain-text users couldn't log in anymore (`compareSync` just returns `false`),
+    so I deleted them in Atlas.
+
+  **The 50-character limit (the model's `validate`):** bcrypt only uses the first 72
+  _bytes_ of a password and silently ignores the rest. Claude tested it on my version:
+  72 × `a` plus `EXTRA` still matched. So Brad lowered the max from 100 to 50 characters. (Bytes, not
+  characters: `č` takes 2 bytes, an emoji 4.)
+- **What I do now:**
+  1. Never store or log a real password; store only the hash from `hashSync`.
+  2. Validate first, hash second, then save.
+  3. Check a password only with `compareSync(typed, storedHash)`, never with `==`.
+  4. Use a slow password hash like bcrypt, never a fast one like `md5` (Brad uses `md5`
+     later only for Gravatar images, not for passwords).
+- **What I learned:** the server never needs to know the password, only whether the typed
+  one produces the same hash. The random salt is why the same password gives different
+  hashes, and why I need `compareSync`, which reuses the salt saved inside the hash.
 
 # Git notes
 

@@ -4,7 +4,7 @@ A social-network style web app built with **Node.js**, **Express**, **MongoDB** 
 
 ## Status
 
-🚧 In progress — built lesson by lesson along with the course. So far (up to lesson 61): registration with validation, users saved in MongoDB Atlas, and login. Passwords are still stored as plain text; hashing comes in the next lessons.
+🚧 In progress — built lesson by lesson along with the course. So far (up to lesson 62): registration with validation, users saved in MongoDB Atlas with passwords hashed by `bcryptjs`, and login. Sessions (staying logged in) come in the next lessons.
 
 ## Goals
 
