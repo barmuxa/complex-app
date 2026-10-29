@@ -4,7 +4,7 @@ A social-network style web app built with **Node.js**, **Express**, **MongoDB** 
 
 ## Status
 
-🚧 In progress — built lesson by lesson along with the course. So far (up to lesson 62): registration with validation, users saved in MongoDB Atlas with passwords hashed by `bcryptjs`, and login. Sessions (staying logged in) come in the next lessons.
+🚧 In progress — built lesson by lesson along with the course. So far (up to lesson 62 of 139): registration with validation, users saved in MongoDB Atlas with passwords hashed by `bcryptjs`, and login. Sessions (staying logged in) come in the next lessons.
 
 ## Goals
 
@@ -18,7 +18,18 @@ The course builds an app where users can:
 ## Approach
 
 1. **Follow the course exactly.** Code and package versions match Brad's lessons (Express 4, MongoDB driver 6, CommonJS `require`, nodemon, dotenv), so the videos and this code behave the same.
-2. **Modernize later.** Once the app is finished, a separate pass will update it (ES modules, Express 5, MongoDB driver 7, `node --watch`, `--env-file`).
+2. **Modernize later.** Once the app is finished, a separate pass will update it. See [Modernization plan](#modernization-plan).
+
+## Modernization plan
+
+After the course, the same app rewritten the modern way, without changing what it does:
+
+1. **Tag the course version** (`git tag brad-version`) and do the rewrite on a branch, so Brad's version stays easy to find.
+2. **ES modules**: `import`/`export` instead of `require`.
+3. **Newer packages and Node features**: Express 5, MongoDB driver 7, `node --watch` instead of nodemon, `--env-file` instead of dotenv.
+4. **Classes** instead of constructor functions with `prototype`, and `async`/`await` everywhere, e.g. `await bcrypt.hash()` instead of `hashSync`, which blocks the server while it hashes.
+5. **TypeScript**: `.ts` files with types, so the editor catches mistakes like `user.usrname` while I type. Node 24 can run `.ts` files directly, so no build step at first. It comes after the other changes because it touches every file.
+6. **Zod** for clean-up and validation: one schema replaces most of `cleanUp` and `validate`, and `z.infer` turns the same schema into a TypeScript type.
 
 ## Running it locally
 
