@@ -12,10 +12,12 @@ Problems I ran into and what I learned while building the Complex App.
   - [Lesson 43 – `href="main.css"` vs `href="/main.css"`](#lesson-43--hrefmaincss-vs-hrefmaincss)
   - [Lesson 47 – `module.exports` vs `exports`](#lesson-47--moduleexports-vs-exports)
   - [Lesson 47 – MVC: which code goes in which file](#lesson-47--mvc-which-code-goes-in-which-file)
+  - [Lesson 47 – same name in two layers: the controller's `login` vs the model's `login`](#lesson-47--same-name-in-two-layers-the-controllers-login-vs-the-models-login)
   - [Lesson 52 – bogus properties: mass assignment and the allow-list in `cleanUp`](#lesson-52--bogus-properties-mass-assignment-and-the-allow-list-in-cleanup)
   - [Lesson 55 – creating a database with the MongoDB VS Code extension (Playground)](#lesson-55--creating-a-database-with-the-mongodb-vs-code-extension-playground)
   - [Lesson 55 – does `"main"` in package.json have to be `db.js`?](#lesson-55--does-main-in-packagejson-have-to-be-dbjs)
   - [Lesson 56 – what `dotenv.config()` does](#lesson-56--what-dotenvconfig-does)
+  - [Lesson 60 – three ways to wait for slow work: callbacks, `.then`, `async`/`await`](#lesson-60--three-ways-to-wait-for-slow-work-callbacks-then-asyncawait)
 - [Git notes](#git-notes)
   - [Git – `git status` shows folders, not the files inside](#git--git-status-shows-folders-not-the-files-inside)
   - [Git – fixing a commit message after pushing (`--amend`, then "cannot push")](#git--fixing-a-commit-message-after-pushing---amend-then-cannot-push)
@@ -192,6 +194,42 @@ Things I learned from Brad's course, by lesson number.
 - **What I learned:** MVC isn't new code, it's a way to sort code. The controller is the
   thin middle that connects the model (data and rules) with the view (HTML).
 
+## Lesson 47 – same name in two layers: the controller's `login` vs the model's `login`
+
+- **Date:** 2026-10-29
+- **Where:** my app (`router.js`, `controllers/userController.js`, `models/User.js`)
+- **What happened:** `controllers/userController.js` has `exports.login = function (req, res)`
+  and `models/User.js` has `User.prototype.login = async function (callback)`. The same
+  happens with `register`. With so many moving parts, two functions with one name confused
+  me: which `login` runs, and when?
+- **Cause:** they are two different functions stored on two different objects, and the
+  part before the dot tells JavaScript (and me) which one is meant:
+  - `userController.login` (the waiter): called by `router.js`. It gets `req` and `res`,
+    creates `new User(req.body)` and sends the answer with `res.send(result)`.
+  - `user.login(...)` (the kitchen): a method every `User` object has. It runs
+    `this.cleanUp()` and looks the user up in `usersCollection`. It knows nothing about
+    `req` or `res`.
+  - inside `userController.js`, a bare `login` doesn't even exist: `exports.login` is a
+    property of the exports object, not a variable, so the controller has to write
+    `user.login(...)`.
+
+  Giving them the same name is a convention on purpose: both are the same step, "log in",
+  seen from two layers. One login request:
+  `router.post('/login', userController.login)` → `user.login(callback)` →
+  `callback('Congrats!')` → `res.send(result)`.
+- **What I do now:**
+  1. I always say the full name, even in my head: "the controller's `login`" or "the
+     model's `login`" (`userController.login` vs `user.login`), never just "`login`".
+  2. To tell them apart, I ask: does it use `req`/`res`? Then it's the controller. Does it
+     use `this.data` or the database? Then it's the model.
+  3. To trace a request, I follow the same name through the files: `router.js` →
+     `controllers/userController.js` → `models/User.js`.
+  4. I keep Brad's names. Other projects make the layer part of the name (e.g.
+     `handleLogin` in the controller, `authenticate()` in the model); that's only style.
+- **What I learned:** the same name in different layers isn't a conflict, it's a
+  convention: the name says _which step_, the file (or the part before the dot) says
+  _which layer_. Matching names make it easy to follow one request from file to file.
+
 ## Lesson 52 – bogus properties: mass assignment and the allow-list in `cleanUp`
 
 - **Date:** 2026-10-28
@@ -298,6 +336,50 @@ Things I learned from Brad's course, by lesson number.
   startup. It keeps secrets out of my code and out of git, and other computers can
   give the same names different values.
 
+## Lesson 60 – three ways to wait for slow work: callbacks, `.then`, `async`/`await`
+
+- **Date:** 2026-10-29
+- **Where:** my app (`models/User.js`, `controllers/userController.js`) and Brad's
+  CodePen meal example
+- **What happened:** in lessons 58–60 I wrote the same login twice: first with a callback,
+  then with a Promise and `.then`/`.catch`. In the CodePen, the meals (`eatBreakfast()`,
+  `eatLunch()`, ...) finished in the wrong order, even though I called them in the right
+  order. I wasn't sure how the three approaches differ.
+- **Cause:** JavaScript _starts_ each function in order, but it doesn't wait for the slow
+  part (a timer, or a database query). That part finishes later, so I need a way to say
+  "do this when it's done":
+  - **Callback**: I hand over a function, and it's called when the work is done
+    (`user.login(function (result) {...})` in lesson 58). Several steps in a row means
+    one level deeper per step ("callback hell"), and every step needs its own error check.
+  - **`.then`/`.catch`**: the slow function returns a Promise, an object for a result that
+    arrives later. `.then` gets the value passed to `resolve`, `.catch` gets what was
+    passed to `reject`. Each `.then` _returns_ the next Promise, so the steps stay flat:
+    `eatBreakfast().then(() => eatLunch()).then(() => eatDinner())`, and one `.catch` at
+    the end handles an error from any step. The controller's `login` uses this now.
+  - **`async`/`await`**: `await` pauses until the Promise settles and gives me its value:
+    `const attemptedUser = await usersCollection.findOne(...)`. The code reads top to
+    bottom like normal code. Brad's favorite.
+
+  Approaches 2 and 3 use the same Promise in two ways: `await` and `.then` both "unwrap"
+  it. MongoDB's `client.connect()`, `findOne()` and `insertOne()` all return Promises.
+  Rules for `await`:
+  - it only works inside an `async` function
+  - if the Promise rejects, `await` _throws_, so I need `try { ... } catch (e) { ... }`
+  - an `async` function always returns a Promise itself, so its caller has to wait too
+- **What I do now:**
+  1. Keep Brad's code as he writes it. From here on he uses `async`/`await` most of the
+     time, not callbacks.
+  2. Every `await` that can fail needs a `try`/`catch` (or a `.catch`) _where the error
+     happens_, so it can become a `reject` and travel up to the code that answers the
+     browser.
+  3. Remember the gap in the model's `login`: if `findOne` fails inside
+     `new Promise(async (resolve, reject) => ...)`, nothing calls `reject`, so the
+     controller's `.catch` never runs and the browser waits forever. Brad's finished app
+     fixes it with `findOne(...).then(...).catch(() => reject('Please try again later.'))`.
+- **What I learned:** all three solve the same problem: "do this when the slow work is
+  done". Callbacks nest, `.then` chains stay flat, and `await` reads like normal code. A
+  rejected Promise still needs a `try`/`catch` or a `.catch`.
+
 # Git notes
 
 Git questions I had along the way. Git isn't part of the course, so these have no lesson number.
@@ -366,27 +448,37 @@ Git questions I had along the way. Git isn't part of the course, so these have n
 - **Date:** 2026-10-28
 - **Where:** my setup (git)
 - **What happened:** I wanted to see everything I had changed since my last commit. I
-  thought plain `git diff` always shows that, but it only compares with the staging area,
-  so changes I had already `git add`-ed weren't in it.
-- **Cause:** git keeps my files in three places ("areas"):
-  - **working directory**: the files on my disk, as I edit them
-  - **staging area** (also called the _index_): what I've `git add`-ed, i.e. what the next
-    commit will contain
-  - **last commit** (`HEAD`): what was saved by my last `git commit`
+  pictured the three areas as a line, working directory → staging area → commits, where
+  my work _moves_ from left to right. So I didn't understand what `git diff` compares:
+  the areas as they were before, or as they are now?
+- **Cause:** I had two things wrong:
+  - **git copies, it doesn't move.** `git add` copies my file into the staging area, and
+    my file stays. `git commit` copies the staging area into a new commit, and the
+    staging area stays full.
+  - **each area always has a full copy of every file.** The staging area (also called
+    the _index_) isn't a box of changes. It's the complete next commit. Right after a
+    commit, all three areas are the same.
 
-  Each `git diff` command compares two of them:
-  - `git diff`: working directory vs staging area (changes I haven't added yet)
-  - `git diff --staged`: staging area vs last commit (what the next commit will contain)
-  - `git diff HEAD`: working directory vs last commit (everything since the last commit)
+  So every `git diff` compares two areas as they are _right now_. Git doesn't remember
+  older versions of my files or of the staging area. Only commits are history.
+  - `git diff`: my files vs the staging area
+  - `git diff --staged`: the staging area vs the last commit
+  - `git diff HEAD`: my files vs the last commit (`HEAD` = the last commit)
 
-  Once I `git add` a file, its changes disappear from `git diff` and move to
-  `git diff --staged`. `git diff HEAD` shows them either way.
+  One file going through time (v1, v2, v3 are its versions):
+  - I commit: all three areas have v1, so every diff is empty
+  - I edit it (my file is v2): `git diff` and `git diff HEAD` both show v1 → v2
+  - I `git add` it (staging is v2): `git diff` is now empty, because my file and the
+    staging area are the same. `git diff --staged` and `git diff HEAD` show v1 → v2.
+  - I edit again (v3), then `git commit`: the commit saves _v2_, not v3, because a commit
+    copies the staging area, not my files
 - **What I do now:**
-  1. To see everything I changed since the last commit: `git diff HEAD`
-     (`git diff HEAD --stat` for just a list of files and line counts).
-  2. Before committing, check what will really go in: `git diff --staged`.
-  3. Run `git status` too, because no `git diff` shows untracked (brand-new) files.
-  4. For one file only: `git diff HEAD -- models/User.js`.
-- **What I learned:** `git diff` with no arguments doesn't mean "since my last commit",
-  it means "not staged yet". `HEAD` is the last commit, so `git diff HEAD` is the one that
-  compares my files with it.
+  1. In my usual workflow I run `git add` and `git commit` right after each other, so
+     nothing is staged in between. Then `git diff` and `git diff HEAD` show the same thing.
+  2. If I `git add` and keep working, I use `git diff HEAD` to see everything since the
+     last commit, and `git diff --staged` to see what the next commit will contain.
+  3. I run `git add` again right before `git commit`, so my latest edits aren't left out.
+  4. I also run `git status`, because no `git diff` shows untracked (brand-new) files.
+- **What I learned:** the three areas are three full copies that exist at the same time,
+  and `git diff` compares them as they are now. A commit saves the staging area, not the
+  files on my disk.
