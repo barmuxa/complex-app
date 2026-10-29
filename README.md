@@ -4,7 +4,7 @@ A social-network style web app built with **Node.js**, **Express**, **MongoDB** 
 
 ## Status
 
-🚧 In progress — built lesson by lesson along with the course.
+🚧 In progress — built lesson by lesson along with the course. So far (up to lesson 61): registration with validation, users saved in MongoDB Atlas, and login. Passwords are still stored as plain text; hashing comes in the next lessons.
 
 ## Goals
 
@@ -38,19 +38,30 @@ The course builds an app where users can:
 
    `npm ci` deletes `node_modules` and installs exactly the versions listed in `package-lock.json`. It never changes that file, and it stops with an error if `package.json` and `package-lock.json` disagree. So every reinstall gets the same versions: after cloning, when `node_modules` acts strangely, or on Render.
 
-2. Start the server (restarts automatically when you save a file):
+2. Create a `.env` file in the project folder (see [Environment variables](#environment-variables) below).
+
+3. Start the server (restarts automatically when you save a `.js` file):
 
    ```bash
    npm run watch
    ```
 
-3. Open http://localhost:3000
+   Or without auto-restart: `npm start`. Both start `db.js`, which connects to MongoDB first and only then starts the Express app from `app.js`. nodemon doesn't watch `.env`, so after changing it, type `rs` and press Enter in the terminal to restart.
+
+4. Open http://localhost:3000
 
 ## Environment variables
 
-Secrets live in a `.env` file, which is listed in `.gitignore` and never committed.
+Secrets and settings live in a `.env` file, which is listed in `.gitignore` and never committed. `db.js` loads it with `dotenv`. Both variables are required:
 
-| Variable           | Description                                                         |
-| ------------------ | ------------------------------------------------------------------- |
-| `CONNECTIONSTRING` | MongoDB Atlas connection string (added once the database is set up) |
-| `PORT`             | Optional. Defaults to `3000`.                                       |
+```
+CONNECTIONSTRING=mongodb+srv://<user>:<password>@<cluster>/ComplexApp?retryWrites=true&w=majority
+PORT=3000
+```
+
+| Variable           | Description                                                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CONNECTIONSTRING` | MongoDB Atlas connection string. The part after `.net/` (`ComplexApp`) is the database the app uses.                                              |
+| `PORT`             | The port the server listens on. There is no default: without it, the app starts on a random port without any error, and `localhost:3000` won't load. |
+
+No quotes, and no spaces around `=`. On a host like Render, set the same names in its dashboard instead of uploading `.env`.
