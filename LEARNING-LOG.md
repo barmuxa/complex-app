@@ -19,6 +19,8 @@ Problems I ran into and what I learned while building the Complex App.
   - [Lesson 56 – what `dotenv.config()` does](#lesson-56--what-dotenvconfig-does)
   - [Lesson 60 – three ways to wait for slow work: callbacks, `.then`, `async`/`await`](#lesson-60--three-ways-to-wait-for-slow-work-callbacks-then-asyncawait)
   - [Lesson 62 – hashing passwords with bcryptjs: `hashSync` and `compareSync`](#lesson-62--hashing-passwords-with-bcryptjs-hashsync-and-comparesync)
+  - [Lesson 63 – how a server trusts a request: authentication vs authorization](#lesson-63--how-a-server-trusts-a-request-authentication-vs-authorization)
+  - [Lesson 63 – sessions and cookies: how `express-session` tells browsers apart](#lesson-63--sessions-and-cookies-how-express-session-tells-browsers-apart)
 - [Git notes](#git-notes)
   - [Git – `git status` shows folders, not the files inside](#git--git-status-shows-folders-not-the-files-inside)
   - [Git – fixing a commit message after pushing (`--amend`, then "cannot push")](#git--fixing-a-commit-message-after-pushing---amend-then-cannot-push)
@@ -439,6 +441,88 @@ Things I learned from Brad's course, by lesson number.
 - **What I learned:** the server never needs to know the password, only whether the typed
   one produces the same hash. The random salt is why the same password gives different
   hashes, and why I need `compareSync`, which reuses the salt saved inside the hash.
+
+## Lesson 63 – how a server trusts a request: authentication vs authorization
+
+- **Date:** 2026-10-30
+- **Where:** Brad's lesson 63 (no code yet, just the idea before sessions)
+- **What happened:** Brad said there are two ways for the server to trust the requests
+  that come after a login: _sessions_ and _tokens_. I wondered if there are others, and
+  what this whole topic is called.
+- **Cause:** HTTP is _stateless_: the server forgets me as soon as it has answered. So
+  every request has to carry some proof of who I am. The ways to do it:
+  - **Session** (lesson 63): the browser sends only an ID in the `connect.sid` cookie;
+    the data (`req.session.user`) stays on the server. Logging out = delete the session.
+  - **Token** (later, for the API, `jsonwebtoken`): the data travels _inside_ a signed
+    token, sent in a header (`Authorization: Bearer <token>`). The server stores
+    nothing, only checks the signature, so a token stays valid until it expires.
+  - **HTTP Basic Auth**: username and password sent with _every_ request (the grey
+    browser pop-up). Only safe with HTTPS.
+  - **API key**: one fixed string that identifies a _program_, not a logged-in person
+    (e.g. the SendGrid key later in the course).
+  - **Client certificates**: proof during the HTTPS connection; mostly between servers.
+
+  "Log in with Google" (OAuth) and passkeys are ways to _log in_, not to stay logged in:
+  afterwards the app still gives me a session or a token.
+
+  All of this is **authentication** ("_who_ are you?"). It's easy to mix up with
+  **authorization** ("_what_ may you do?"), which always comes second.
+- **What I do now:**
+  1. Ask "who is this?" (authentication) separately from "may they do this?"
+     (authorization).
+  2. Expect both in the course: login, sessions and `mustBeLoggedIn` are authentication;
+     "only the author can edit or delete their post" is authorization.
+- **What I learned:** I can log in in many ways (password, Google, passkey). But after
+  that, the server remembers me with a session cookie or a token in almost every web
+  app, and those are the two that Brad teaches. Authentication (authn) says who I am;
+  authorization (authz) says what I'm allowed to do.
+
+## Lesson 63 – sessions and cookies: how `express-session` tells browsers apart
+
+- **Date:** 2026-10-30
+- **Where:** my app (`app.js`, `controllers/userController.js`), `express-session@1.19.0`
+- **What happened:** after a successful login, the controller's `login` now stores
+  `req.session.user = { hobby: 'coding', username: user.data.username }`, and the
+  controller's `home` shows "Welcome to the actual application." when
+  `req.session.user` exists. It worked in Chrome, but a private window still got the
+  guest page. I wondered how the server keeps one session per visitor apart from all
+  the others.
+- **Cause:** `app.use(sessionOptions)` runs before my routes on every request. With the
+  default store, all sessions live in one object in the server's memory
+  (`this.sessions` in `express-session/session/memory.js`), keyed by session ID:
+  `{ '<id 1>': { cookie, user }, '<id 2>': { cookie, user } }`. On each request:
+  1. It looks for the `connect.sid` cookie (Brad says "Connected", but that's the name).
+     - **no cookie**: a new, empty `req.session` with a new ID: `uid(24)`, 24 random
+       bytes written as 32 characters. Impossible to guess.
+     - **a cookie**: it checks the cookie's _signature_ with my `secret`. If it matches,
+       it finds that ID in the store and puts its data on `req.session`. If someone
+       edited the ID, the signature fails and they get a new, empty session instead.
+  2. My controller reads or writes `req.session`, which is only this visitor's entry.
+  3. When the response is sent, it saves the session under its ID and sends
+     `Set-Cookie: connect.sid=s:<id>.<signature>`. The browser then sends that cookie back
+     automatically with every request to `localhost:3000`.
+
+  So the server recognizes _cookies_, not people: Chrome and a private window have
+  different cookies, so they are two different sessions. The options in my `app.js`:
+  - `secret`: signs the cookie, so nobody can fake or change an ID. Must stay secret, so
+    mine is `process.env.SESSIONSECRET` from `.env`, not text in `app.js` (Brad's way).
+  - `resave: false`: don't save a session again if it didn't change.
+  - `saveUninitialized: false`: a cookie only once something is stored, so only after
+    login. `true` would give every guest a cookie and a session on the first visit.
+  - `cookie.maxAge`: how long the cookie lives, in ms: `1000 * 60 * 60 * 24` = 1 day.
+  - `cookie.httpOnly: true`: JavaScript in the page can't read the cookie
+    (`document.cookie`), so a malicious script can't steal it.
+- **What I do now:**
+  1. Put `app.use(sessionOptions)` _above_ `app.use('/', router)`; otherwise
+     `req.session` is `undefined` in my controllers.
+  2. Check the cookie in DevTools → _Application_ → _Cookies_ → `localhost:3000`:
+     `connect.sid`, with _HttpOnly_ ticked.
+  3. Remember that sessions are in memory for now: every nodemon restart wipes them. My
+     browser still has the cookie, but the server no longer knows its ID, so I'm a guest
+     again. The next lesson moves sessions into MongoDB with `connect-mongo`.
+- **What I learned:** the browser keeps only a signed, random ID; the data stays on the
+  server. The ID can't be guessed and the signature means it can't be faked, so "you
+  have an ID I gave you" is enough for the server to trust the request.
 
 # Git notes
 

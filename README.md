@@ -63,16 +63,18 @@ After the course, the same app rewritten the modern way, without changing what i
 
 ## Environment variables
 
-Secrets and settings live in a `.env` file, which is listed in `.gitignore` and never committed. `db.js` loads it with `dotenv`. Both variables are required:
+Secrets and settings live in a `.env` file, which is listed in `.gitignore` and never committed. `db.js` loads it with `dotenv`. All three variables are required:
 
 ```
 CONNECTIONSTRING=mongodb+srv://<user>:<password>@<cluster>/ComplexApp?retryWrites=true&w=majority
 PORT=3000
+SESSIONSECRET=<long random text>
 ```
 
 | Variable           | Description                                                                                                                                       |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `CONNECTIONSTRING` | MongoDB Atlas connection string. The part after `.net/` (`ComplexApp`) is the database the app uses.                                              |
 | `PORT`             | The port the server listens on. There is no default: without it, the app starts on a random port without any error, and `localhost:3000` won't load. |
+| `SESSIONSECRET`    | Signs the session cookie (`connect.sid`), so nobody can fake one. Any long random text, e.g. from `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Changing it logs everyone out. |
 
 No quotes, and no spaces around `=`. On a host like Render, set the same names in its dashboard instead of uploading `.env`.
