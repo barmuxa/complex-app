@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const usersCollection = require('../db.js').collection('users');
+const usersCollection = require('../db.js').db().collection('users'); // get the 'users' collection from the connected MongoDB client
 const validator = require('validator');
 
 let User = function (data) {

@@ -22,6 +22,7 @@ Problems I ran into and what I learned while building the Complex App.
   - [Lesson 63 – how a server trusts a request: authentication vs authorization](#lesson-63--how-a-server-trusts-a-request-authentication-vs-authorization)
   - [Lesson 63 – sessions and cookies: how `express-session` tells browsers apart](#lesson-63--sessions-and-cookies-how-express-session-tells-browsers-apart)
   - [Lesson 64 – session security: CSRF and `sameSite: 'strict'`](#lesson-64--session-security-csrf-and-samesite-strict)
+  - [Lesson 65 – passing data to an EJS template: `res.render` and `<%= %>`](#lesson-65--passing-data-to-an-ejs-template-resrender-and--)
 - [Git notes](#git-notes)
   - [Git – `git status` shows folders, not the files inside](#git--git-status-shows-folders-not-the-files-inside)
   - [Git – fixing a commit message after pushing (`--amend`, then "cannot push")](#git--fixing-a-commit-message-after-pushing---amend-then-cannot-push)
@@ -570,6 +571,46 @@ Things I learned from Brad's course, by lesson number.
 - **What I learned:** cookies are sent automatically, which is what makes sessions work
   and also what CSRF abuses. `sameSite: 'strict'` makes the browser keep my session
   cookie away from requests that other sites start.
+
+## Lesson 65 – passing data to an EJS template: `res.render` and `<%= %>`
+
+- **Date:** 2026-10-30
+- **Where:** my app (`controllers/userController.js`, `views/home-dashboard.ejs`),
+  `ejs@3.1.10`
+- **What happened:** Brad replaced the placeholder name in the dashboard's `<h2>` with
+  `<%= username %>`, and now the page says "Hello cat" for each logged-in user. He said
+  `<% %>` runs JavaScript and the `=` prints something. I wanted to understand the tags,
+  and where `username` comes from, since the template never reads `req.session`.
+- **Cause:** EJS is a _template engine_: an HTML file with holes in it. The controller
+  fills the holes with the second argument of `res.render`:
+  ```js
+  res.render('home-dashboard', { username: req.session.user.username });
+  ```
+  Every property of that object becomes a variable in the template, so `username` exists
+  there. Nothing else does: the template can't see `req`, `req.session` or my controller's
+  variables unless I pass them. EJS turns the template into HTML on the server, and the
+  browser only gets the finished HTML. The tags:
+  - `<% %>`: runs JavaScript, prints nothing (for `if` and loops, later in the course)
+  - `<%= %>`: prints the value, _escaped_: `<` becomes `&lt;` and `>` becomes `&gt;`.
+    Claude tested it on my version: a username `<b>cat</b>` comes out as text,
+    `&lt;b&gt;cat&lt;/b&gt;`, so the browser shows it instead of running it as HTML.
+  - `<%- %>`: prints the value _raw_, as real HTML. Safe only for HTML I wrote or
+    cleaned myself, never for text a user typed.
+  - `<%# %>`: a comment; it isn't sent to the browser at all
+
+  Inside the tags, any JavaScript expression works, not just a variable: my
+  `home-guest.ejs` footer already has `<%= new Date().getFullYear() %>`. A misspelled or
+  missing variable (`<%= usernme %>`, or `res.render` without the object) gives
+  `ReferenceError: usernme is not defined`, and the page doesn't render at all.
+- **What I do now:**
+  1. Pass data as the second argument of `res.render` and use the same property name in
+     the template.
+  2. Print anything a user typed (username, post title, ...) with `<%= %>`.
+  3. Use `<%- %>` only for HTML I trust.
+  4. If I see "... is not defined", check the spelling in both files, and that the
+     controller really passes that property.
+- **What I learned:** `res.render(view, data)` hands the template only what's in `data`.
+  `<%=` prints it safely escaped, `<%-` prints it as raw HTML, and `<%` just runs code.
 
 # Git notes
 

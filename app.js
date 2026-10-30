@@ -1,5 +1,6 @@
 const express = require('express');
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const app = express();
 
 // Session middleware
@@ -8,6 +9,7 @@ const sessionOptions = session({
   resave: false, // don't save session if unmodified
   saveUninitialized: false, // don't create session until something stored
   cookie: { maxAge: 1000 * 60 * 60 * 24, httpOnly: true, sameSite: 'strict' }, // 1 day and HTTP only meaning the cookie cannot be accessed via client-side JavaScript
+  store: MongoStore.create({ client: require('./db') }), // store session in MongoDB
 });
 
 app.use(sessionOptions);
