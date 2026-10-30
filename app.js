@@ -7,7 +7,7 @@ const sessionOptions = session({
   secret: process.env.SESSIONSECRET, // secret used to sign the session ID cookie (in .env, so it's not on GitHub)
   resave: false, // don't save session if unmodified
   saveUninitialized: false, // don't create session until something stored
-  cookie: { maxAge: 1000 * 60 * 60 * 24, httpOnly: true }, // 1 day and HTTP only meaning the cookie cannot be accessed via client-side JavaScript
+  cookie: { maxAge: 1000 * 60 * 60 * 24, httpOnly: true, sameSite: 'strict' }, // 1 day and HTTP only meaning the cookie cannot be accessed via client-side JavaScript
 });
 
 app.use(sessionOptions);

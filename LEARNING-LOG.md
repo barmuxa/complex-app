@@ -21,6 +21,7 @@ Problems I ran into and what I learned while building the Complex App.
   - [Lesson 62 – hashing passwords with bcryptjs: `hashSync` and `compareSync`](#lesson-62--hashing-passwords-with-bcryptjs-hashsync-and-comparesync)
   - [Lesson 63 – how a server trusts a request: authentication vs authorization](#lesson-63--how-a-server-trusts-a-request-authentication-vs-authorization)
   - [Lesson 63 – sessions and cookies: how `express-session` tells browsers apart](#lesson-63--sessions-and-cookies-how-express-session-tells-browsers-apart)
+  - [Lesson 64 – session security: CSRF and `sameSite: 'strict'`](#lesson-64--session-security-csrf-and-samesite-strict)
 - [Git notes](#git-notes)
   - [Git – `git status` shows folders, not the files inside](#git--git-status-shows-folders-not-the-files-inside)
   - [Git – fixing a commit message after pushing (`--amend`, then "cannot push")](#git--fixing-a-commit-message-after-pushing---amend-then-cannot-push)
@@ -523,6 +524,52 @@ Things I learned from Brad's course, by lesson number.
 - **What I learned:** the browser keeps only a signed, random ID; the data stays on the
   server. The ID can't be guessed and the signature means it can't be faked, so "you
   have an ID I gave you" is enough for the server to trust the request.
+
+## Lesson 64 – session security: CSRF and `sameSite: 'strict'`
+
+- **Date:** 2026-10-30
+- **Where:** my app (`app.js`, the session cookie options)
+- **What happened:** Brad added one option to the session cookie and said it protects
+  against _CSRF_ attacks, without explaining what CSRF is:
+  ```js
+  cookie: { maxAge: 1000 * 60 * 60 * 24, httpOnly: true, sameSite: 'strict' },
+  ```
+  I wanted to know what the attack is and why one line stops it.
+- **Cause:** the browser sends my `connect.sid` cookie automatically with _every_ request
+  to my app, no matter which page started the request. _CSRF_ (Cross-Site Request
+  Forgery) uses exactly that:
+  1. I'm logged in to my app, so my browser has the session cookie.
+  2. I visit `evil.com`. It has a hidden form that submits itself to my app (e.g.
+     `POST /delete-post`).
+  3. My browser sends the request _with my cookie_, so the server thinks it's me.
+
+  The attacker never sees the cookie (`httpOnly` hides it anyway); my own browser does
+  the work. `sameSite: 'strict'` tells the browser to send the cookie only when the
+  request comes from my own site. A request started by `evil.com` arrives without it, so
+  the server treats it as a guest and the attack does nothing.
+- **What I do now:**
+  1. Spell it exactly: `sameSite` with a capital S, and the value `'strict'` in
+     lowercase. A typo gives no error; the option just does nothing.
+  2. Check it in DevTools → _Application_ → _Cookies_ → `localhost:3000` →
+     `connect.sid`: the _SameSite_ column must say _Strict_.
+  3. Log in again after the change. Saving `app.js` restarts nodemon, which wipes the
+     in-memory sessions, and the browser only gets the new setting when the server sends
+     the cookie again.
+  4. Remember that a _site_ is not an _origin_. A site is the main domain, without
+     subdomains and ports: `media.mydomain.com` is the same site as `mydomain.com`. So a
+     hacked subdomain could still get my cookie sent, which is Brad's warning. For the
+     same reason, `localhost:3000` (my app) and `localhost:4000` (my roadmap) are the
+     same site; harmless, since both are mine.
+  5. Expect the side effect of `strict`: if I click a link to my app from _another_ site
+     (e.g. an email in Gmail), that first request also comes without the cookie, so I
+     look logged out until I click around or refresh. The milder `'lax'` sends the
+     cookie on simple link clicks but still blocks cross-site form `POST`s. Brad uses
+     `strict`, so I do too.
+  6. Brad's later CSRF chapter shows the old fix: a CSRF token in every form (the
+     `csurf` package). That's history; `sameSite` gives the same protection now.
+- **What I learned:** cookies are sent automatically, which is what makes sessions work
+  and also what CSRF abuses. `sameSite: 'strict'` makes the browser keep my session
+  cookie away from requests that other sites start.
 
 # Git notes
 
