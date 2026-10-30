@@ -6,12 +6,18 @@ exports.login = function (req, res) {
     .login()
     .then(result => {
       req.session.user = { hobby: 'coding', username: user.data.username };
-      res.send(result);
+      req.session.save(function () {
+        res.redirect('/');
+      });
     })
     .catch(err => res.send(err));
 };
 
-exports.logout = function (req, res) {};
+exports.logout = function (req, res) {
+  req.session.destroy(function () {
+    res.redirect('/');
+  });
+};
 
 exports.register = function (req, res) {
   let user = new User(req.body);

@@ -23,6 +23,7 @@ Problems I ran into and what I learned while building the Complex App.
   - [Lesson 63 – sessions and cookies: how `express-session` tells browsers apart](#lesson-63--sessions-and-cookies-how-express-session-tells-browsers-apart)
   - [Lesson 64 – session security: CSRF and `sameSite: 'strict'`](#lesson-64--session-security-csrf-and-samesite-strict)
   - [Lesson 65 – passing data to an EJS template: `res.render` and `<%= %>`](#lesson-65--passing-data-to-an-ejs-template-resrender-and--)
+  - [Lesson 66 – `req.session.destroy()` takes a callback, not `await`](#lesson-66--reqsessiondestroy-takes-a-callback-not-await)
 - [Git notes](#git-notes)
   - [Git – `git status` shows folders, not the files inside](#git--git-status-shows-folders-not-the-files-inside)
   - [Git – fixing a commit message after pushing (`--amend`, then "cannot push")](#git--fixing-a-commit-message-after-pushing---amend-then-cannot-push)
@@ -611,6 +612,46 @@ Things I learned from Brad's course, by lesson number.
      controller really passes that property.
 - **What I learned:** `res.render(view, data)` hands the template only what's in `data`.
   `<%=` prints it safely escaped, `<%-` prints it as raw HTML, and `<%` just runs code.
+
+## Lesson 66 – `req.session.destroy()` takes a callback, not `await`
+
+- **Date:** 2026-10-30
+- **Where:** my app (`controllers/userController.js`, the controller's `logout`),
+  `express-session@1.19.0`
+- **What happened:** my first version of the controller's `logout` was
+  ```js
+  req.session.destroy();
+  res.redirect('/');
+  ```
+  Brad said to put the redirect inside a callback, because the session package doesn't
+  return Promises "as of the time of this recording", so I wondered if it's still true, and
+  if I could just write `await req.session.destroy()` instead.
+- **Cause:** deleting the session in Atlas takes a moment. Without waiting, the redirect
+  goes out at once, and the browser's `GET /` can arrive while the session still
+  exists, so I'd see the dashboard right after signing out. The same goes for login
+  and `req.session.save()`.
+
+  Brad is still right: `1.19.0` is the newest version, and in its `session/session.js`
+  both `destroy` and `save` end with `return this;`. They return the session object,
+  not a Promise, and they take a function (a callback) that the store calls when it's
+  done. `await` only waits for a Promise; given anything else, it carries on at once.
+  So `await req.session.destroy()` gives no error, but it still redirects too early,
+  the same bug, just harder to see.
+- **What I do now:**
+  1. Put the redirect inside the callback, so it runs only after the store is done:
+     ```js
+     req.session.destroy(function () {
+       res.redirect('/');
+     });
+     ```
+     The same for login: `req.session.save(function () { res.redirect('/'); });`.
+  2. Before I `await` something, I check that it really returns a Promise (the docs,
+     or the package's code in `node_modules`).
+  3. If I ever want `await` here (e.g. when modernizing), I wrap the call in
+     `new Promise(...)` myself, like the model's `login` does.
+- **What I learned:** `await` doesn't make a function wait; it only waits for a Promise
+  that the function returns. Libraries that use callbacks, like `express-session`,
+  still need the callback.
 
 # Git notes
 
