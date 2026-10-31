@@ -5,12 +5,19 @@ exports.login = function (req, res) {
   user
     .login()
     .then(result => {
-      req.session.user = { hobby: 'coding', username: user.data.username };
+      req.session.user = { hobby: 'coding', username: user.data.username }; // saving user info in session
       req.session.save(function () {
+        // ensure session is saved before redirecting
         res.redirect('/');
       });
     })
-    .catch(err => res.send(err));
+    .catch(err => {
+      req.flash('errors', err); // saving error message in session flash object
+      req.session.save(function () {
+        // ensure session is saved before redirecting
+        res.redirect('/');
+      });
+    });
 };
 
 exports.logout = function (req, res) {
@@ -33,6 +40,6 @@ exports.home = function (req, res) {
   if (req.session.user) {
     res.render('home-dashboard', { username: req.session.user.username });
   } else {
-    res.render('home-guest');
+    res.render('home-guest', { errors: req.flash('errors') });
   }
 };

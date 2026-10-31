@@ -4,7 +4,7 @@ A social-network style web app built with **Node.js**, **Express**, **MongoDB** 
 
 ## Status
 
-🚧 In progress — built lesson by lesson along with the course. So far (up to lesson 64 of 139): registration with validation, users saved in MongoDB Atlas with passwords hashed by `bcryptjs`, login, and sessions with `express-session` that keep users logged in (the cookie is `httpOnly` and `sameSite: 'strict'`). Sessions are kept in memory for now, so every server restart logs everyone out; storing them in MongoDB comes next.
+🚧 In progress — built lesson by lesson along with the course. So far (up to lesson 67 of 139): registration with validation, users saved in MongoDB Atlas with passwords hashed by `bcryptjs`, login and logout, and sessions with `express-session` that keep users logged in (the cookie is `httpOnly` and `sameSite: 'strict'`). Sessions are stored in MongoDB with `connect-mongo`, so a server restart doesn't log anyone out. Logged-in users see a dashboard with their username, and a failed login shows a one-time error message on the home page (`connect-flash`). Registration errors still appear as plain text; showing them on the page comes next.
 
 ## Goals
 
