@@ -24,6 +24,7 @@ Problems I ran into and what I learned while building the Complex App.
   - [Lesson 64 – session security: CSRF and `sameSite: 'strict'`](#lesson-64--session-security-csrf-and-samesite-strict)
   - [Lesson 65 – passing data to an EJS template: `res.render` and `<%= %>`](#lesson-65--passing-data-to-an-ejs-template-resrender-and--)
   - [Lesson 66 – `req.session.destroy()` takes a callback, not `await`](#lesson-66--reqsessiondestroy-takes-a-callback-not-await)
+  - [Lesson 67 – `connect-flash` gives every guest a cookie, despite `saveUninitialized: false`](#lesson-67--connect-flash-gives-every-guest-a-cookie-despite-saveuninitialized-false)
 - [Git notes](#git-notes)
   - [Git – `git status` shows folders, not the files inside](#git--git-status-shows-folders-not-the-files-inside)
   - [Git – fixing a commit message after pushing (`--amend`, then "cannot push")](#git--fixing-a-commit-message-after-pushing---amend-then-cannot-push)
@@ -652,6 +653,44 @@ Things I learned from Brad's course, by lesson number.
 - **What I learned:** `await` doesn't make a function wait; it only waits for a Promise
   that the function returns. Libraries that use callbacks, like `express-session`,
   still need the callback.
+
+## Lesson 67 – `connect-flash` gives every guest a cookie, despite `saveUninitialized: false`
+
+- **Date:** 2026-10-31
+- **Where:** my app (`controllers/userController.js`, the controller's `home`),
+  `connect-flash@0.1.1`, `express-session@1.19.0`
+- **What happened:** I opened the home page as a guest who had never logged in, and the
+  browser still got a `connect.sid` cookie. I expected none, because `app.js` sets
+  `saveUninitialized: false`, which I understood as "no cookie for guests". Claude
+  checked with `curl`, sending no cookie at all: the response still had a `Set-Cookie`
+  header.
+- **Cause:** `saveUninitialized: false` doesn't mean "no cookie for guests". It means "don't
+  save a _new session that nothing has changed_". Normally guests change nothing, so
+  they get no cookie, but that's only the usual result.
+
+  Since lesson 67 the controller's `home` calls `req.flash('errors')` for every guest.
+  In `node_modules/connect-flash/lib/flash.js`, every call to `req.flash`, even one
+  that only reads, starts with:
+  ```js
+  var msgs = this.session.flash = this.session.flash || {};
+  ```
+  So reading puts an empty `flash: {}` into the session. Now the session _has_ changed,
+  so `express-session` saves it to MongoDB and sends a cookie. Neither package has a
+  bug: each does what its code says, and together they give every visitor a session.
+- **What I do now:**
+  1. I remember that "logged in" means `req.session.user` exists, not "has a cookie".
+     Since lesson 67 every visitor to `/` has a cookie and a session document in Atlas
+     (only `cookie` and `flash: {}`), which the TTL index deletes after a day.
+  2. I keep Brad's code, because the next lessons build on it. If I wanted to avoid it,
+     I'd read flash only when something is there:
+     ```js
+     res.render('home-guest', { errors: req.session.flash ? req.flash('errors') : [] });
+     ```
+  3. When a setting doesn't do what I expected, I read what it promises exactly, and
+     look for other code that touches the same thing.
+- **What I learned:** `saveUninitialized: false` skips only _unchanged_ new sessions. Any
+  middleware that writes to `req.session`, even while reading, makes the session
+  "changed" and gives the visitor a cookie.
 
 # Git notes
 
